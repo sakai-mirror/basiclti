@@ -1,0 +1,16 @@
+<projectDescription>
+  <name>sakai-mailarchive-pack</name>
+  <comment/>
+  <projects>
+    <project>sakai-mailarchive-impl</project>
+    <project>sakai-message-impl</project>
+  </projects>
+  <buildSpec>
+    <buildCommand>
+      <name>org.eclipse.jdt.core.javabuilder</name>
+    </buildCommand>
+  </buildSpec>
+  <natures>
+    <nature>org.eclipse.jdt.core.javanature</nature>
+  </natures>
+</projectDescription>
