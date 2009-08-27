@@ -1,8 +1,9 @@
 <projectDescription>
-  <name>sakai-basiclti-impl</name>
+  <name>sakai-blti-portlet</name>
   <comment/>
   <projects>
     <project>sakai-blti-util</project>
+    <project>sakai-portlet-util</project>
   </projects>
   <buildSpec>
     <buildCommand>

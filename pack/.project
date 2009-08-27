@@ -1,9 +1,9 @@
 <projectDescription>
-  <name>sakai-mailarchive-pack</name>
+  <name>sakai-basiclti-pack</name>
   <comment/>
   <projects>
-    <project>sakai-mailarchive-impl</project>
-    <project>sakai-message-impl</project>
+    <project>sakai-basiclti-impl</project>
+    <project>sakai-blti-util</project>
   </projects>
   <buildSpec>
     <buildCommand>

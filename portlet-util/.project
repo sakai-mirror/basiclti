@@ -1,9 +1,7 @@
 <projectDescription>
-  <name>sakai-basiclti-impl</name>
+  <name>sakai-portlet-util</name>
   <comment/>
-  <projects>
-    <project>sakai-blti-util</project>
-  </projects>
+  <projects/>
   <buildSpec>
     <buildCommand>
       <name>org.eclipse.jdt.core.javabuilder</name>
