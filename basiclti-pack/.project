@@ -1,0 +1,16 @@
+<projectDescription>
+  <name>sakai-basiclti-pack</name>
+  <comment/>
+  <projects>
+    <project>sakai-basiclti-impl</project>
+    <project>sakai-blti-util</project>
+  </projects>
+  <buildSpec>
+    <buildCommand>
+      <name>org.eclipse.jdt.core.javabuilder</name>
+    </buildCommand>
+  </buildSpec>
+  <natures>
+    <nature>org.eclipse.jdt.core.javanature</nature>
+  </natures>
+</projectDescription>
