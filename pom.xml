@@ -98,7 +98,7 @@
             <layout>default</layout>
             <url>http://source.sakaiproject.org/maven2-snapshots</url>
             <snapshots>
-                <enabled>true</enabled>
+                <enabled>false</enabled>
             </snapshots>
         </repository>
         <repository>
