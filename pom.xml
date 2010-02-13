@@ -19,17 +19,6 @@
     <inceptionYear>2009</inceptionYear>
     <packaging>pom</packaging>
 
-    <!-- Change this to the Sakai released version you're running -->
-    <!-- Unreleased or snapshot tags may require the entire source -->
-    <!-- example: <version>2.6.1</version> -->
-    <!--
-    <parent>
-        <artifactId>master</artifactId>
-        <groupId>org.sakaiproject</groupId>
-        <version>2.7.0-SNAPSHOT</version>
-    </parent>
-    -->
-
     <properties>
         <url.localsite>scp://source.sakaiproject.org/var/www/html/release/basiclti/${project.version}</url.localsite>
     </properties>
