@@ -9,7 +9,7 @@
 
                 <category name="course" />
                 <category name="project" />
-		<category name="portfolio" />
+		        <category name="portfolio" />
 
                 <!-- Allow this to be set -->
                 <configuration name="functions.require" />
@@ -40,7 +40,7 @@
                 <configuration name="imsti.custom" />
 
                 <!-- Setting these to true means the corresponding above values 
-		     cannot be altered by by the instructor.  -->
+		        cannot be altered by by the instructor.  -->
                 <configuration name="final.launch" value="false"/>
                 <configuration name="final.xml" value="false"/>
                 <configuration name="final.secret" value="false"/>
@@ -53,6 +53,9 @@
                 <configuration name="final.releasename" value="false"/>
                 <configuration name="final.releaseemail" value="false"/>
                 <configuration name="final.custom" value="false"/>
+                
+                <!-- Allow multiple instances of this tool within one site -->
+                <configuration name="allowMultipleInstances" value="true" />
 
         </tool>
 
@@ -66,7 +69,7 @@
 
                 <category name="course" />
                 <category name="project" />
-		<category name="portfolio" />
+		        <category name="portfolio" />
 
                 <configuration name="functions.require" />
 
