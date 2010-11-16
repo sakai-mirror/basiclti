@@ -55,6 +55,8 @@ public class SakaiBLTIUtil {
 
     public static final String BASICLTI_OUTCOMES_ENABLED = "basiclti.outcomes.enabled";
     public static final String BASICLTI_SETTINGS_ENABLED = "basiclti.settings.enabled";
+    public static final String BASICLTI_ROSTER_ENABLED = "basiclti.roster.enabled";
+    public static final String BASICLTI_CONTENTLINK_ENABLED = "basiclti.contentlink.enabled";
 
     public static void dPrint(String str)
     {
@@ -66,14 +68,28 @@ public class SakaiBLTIUtil {
     public static String getCorrectProperty(Properties config,
                    String propName, Placement placement)
     {
+        // Check for global overrides in properties
+        String allowSettings = ServerConfigurationService.getString(BASICLTI_SETTINGS_ENABLED, null);
+        if ( "allowsettings".equals(propName) && ! "true".equals(allowSettings) ) return "false";
+
+        String allowRoster = ServerConfigurationService.getString(BASICLTI_ROSTER_ENABLED, null);
+        if ( "allowroster".equals(propName) && ! "true".equals(allowRoster) ) return "false";
+
+        String allowContentLink = ServerConfigurationService.getString(BASICLTI_CONTENTLINK_ENABLED, null);
+        if ( "contentlink".equals(propName) && ! "true".equals(allowContentLink) ) return null;
+
+        // Check for explicit setting in properties
         String propertyName = placement.getToolId() + "." + propName;
         String propValue = ServerConfigurationService.getString(propertyName,null);
         if ( propValue != null && propValue.trim().length() > 0 ) {
                 // System.out.println("Sakai.home "+propName+"="+propValue);
                 return propValue;
         }
+
+	// Take it from the placement
         return config.getProperty("imsti."+propName, null);
     }
+
     // Look at a Placement and come up with the launch urls, and
     // other launch parameters to drive the launch.
     public static boolean loadFromPlacement(Properties info, Properties launch, Placement placement)
@@ -176,34 +192,19 @@ public class SakaiBLTIUtil {
 		}
  
 	        String assignment = toNull(getCorrectProperty(config,"assignment", placement));
-
-		String placementSecret = toNull(getCorrectProperty(config,"placementsecret", placement));
                 String allowOutcomes = ServerConfigurationService.getString(
                                 SakaiBLTIUtil.BASICLTI_OUTCOMES_ENABLED, null);
                 if ( ! "true".equals(allowOutcomes) ) allowOutcomes = null;
 
-                String allowSettings = ServerConfigurationService.getString(
-                                SakaiBLTIUtil.BASICLTI_SETTINGS_ENABLED, null);
-                if ( ! "true".equals(allowSettings) ) allowSettings = null;
+	        String allowSettings = toNull(getCorrectProperty(config,"allowsettings", placement));
+                if ( ! "on".equals(allowSettings) ) allowSettings = null;
 
-		if ( placementSecret != null ) {
-			String suffix = ":::" +  user.getId() + ":::" + placement.getId();
-			String base_string = placementSecret + suffix;
-			String signature = ShaUtil.sha256Hash(base_string);
-			String result_sourcedid = signature + suffix;
+	        String allowRoster = toNull(getCorrectProperty(config,"allowroster", placement));
+                if ( ! "on".equals(allowRoster) ) allowRoster = null;
 
-                	if ( "true".equals(allowSettings) ) {
-				setProperty(props,"ext_ims_lti_tool_setting_id", result_sourcedid);  
-	
-				String setting = config.getProperty("toolsetting", null);
-				if ( setting != null ) {
-					setProperty(props,"ext_ims_lti_tool_setting", setting);  
-				}
-				String service_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lti_tool_setting_url",null);
-        			if ( service_url == null ) service_url = getOurServerUrl() + "/imsblis/service/";  
-				setProperty(props,"ext_ims_lti_tool_setting_url", service_url);  
-			}
-	
+		String result_sourcedid = getSourceDID(user, placement, config);
+		if ( result_sourcedid != null ) {
+
                 	if ( "true".equals(allowOutcomes) && assignment != null ) {
 				setProperty(props,"lis_result_sourcedid", result_sourcedid);  
 	
@@ -217,6 +218,26 @@ public class SakaiBLTIUtil {
         			if ( outcome_url == null ) outcome_url = getOurServerUrl() + "/imsblis/service/";  
 				setProperty(props,"ext_ims_lis_basic_outcome_url", outcome_url);  
 	
+			}
+
+                	if ( "on".equals(allowSettings) ) {
+				setProperty(props,"ext_ims_lti_tool_setting_id", result_sourcedid);  
+	
+				String setting = config.getProperty("toolsetting", null);
+				if ( setting != null ) {
+					setProperty(props,"ext_ims_lti_tool_setting", setting);  
+				}
+				String service_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lti_tool_setting_url",null);
+        			if ( service_url == null ) service_url = getOurServerUrl() + "/imsblis/service/";  
+				setProperty(props,"ext_ims_lti_tool_setting_url", service_url);  
+			}
+
+                	if ( "on".equals(allowRoster) ) {
+				setProperty(props,"ext_ims_lis_memberships_id", result_sourcedid);  
+
+				String roster_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lis_memberships_url",null);
+        			if ( roster_url == null ) roster_url = getOurServerUrl() + "/imsblis/service/";  
+				setProperty(props,"ext_ims_lis_memberships_url", roster_url);  
 			}
 		}
 	}
@@ -277,6 +298,10 @@ public class SakaiBLTIUtil {
 		ServerConfigurationService.getString("basiclti.consumer_instance_url",null));
 	setProperty(props,BasicLTIConstants.LAUNCH_PRESENTATION_RETURN_URL, 
 		ServerConfigurationService.getString("basiclti.consumer_return_url",null));
+
+	// Send along the content link
+        String contentlink = toNull(getCorrectProperty(config,"contentlink", placement));
+	if ( contentlink != null ) setProperty(props,"ext_resource_link_content",contentlink);
 
 	// Send along the CSS URL
 	String tool_css = ServerConfigurationService.getString("basiclti.consumer.launch_presentation_css_url",null);
@@ -398,6 +423,17 @@ public class SakaiBLTIUtil {
 
         String [] retval = { postData, launch_url };
         return retval;
+    }
+
+
+    public static String getSourceDID(User user, Placement placement, Properties config)
+    {
+	String placementSecret = toNull(getCorrectProperty(config,"placementsecret", placement));
+	if ( placementSecret == null ) return null;
+	String suffix = ":::" +  user.getId() + ":::" + placement.getId();
+	String base_string = placementSecret + suffix;
+	String signature = ShaUtil.sha256Hash(base_string);
+	return signature + suffix;
     }
 
     public static String[] postError(String str) {

@@ -125,6 +125,9 @@ public class IMSBLTIPortlet extends GenericPortlet {
         fieldList.add("assignment");
         fieldList.add("newpage");
         fieldList.add("maximize");
+        fieldList.add("allowsettings");
+        fieldList.add("allowroster");
+        fieldList.add("contentlink");
     }
 
     // Simple Debug Print Mechanism
@@ -153,8 +156,6 @@ public class IMSBLTIPortlet extends GenericPortlet {
         response.setContentType("text/html; charset=UTF-8");
 
         PrintWriter out = response.getWriter();
-        PortletSession pSession = request.getPortletSession(true);
-        PortletPreferences prefs = request.getPreferences();
 
 	String title = getTitleString(request);
 	if ( title != null ) response.setTitle(title);
@@ -256,6 +257,13 @@ public class IMSBLTIPortlet extends GenericPortlet {
 	  	List<String> assignments = getGradeBookAssignments();
         	if ( assignments != null && assignments.size() > 0 ) request.setAttribute("assignments", assignments);
 	}
+
+        String allowSettings = ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_SETTINGS_ENABLED, null);
+        request.setAttribute("allowSettings", new Boolean("true".equals(allowSettings)));
+        String allowRoster = ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_ROSTER_ENABLED, null);
+        request.setAttribute("allowRoster", new Boolean("true".equals(allowRoster)));
+        String allowContentLink = ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_CONTENTLINK_ENABLED, null);
+        request.setAttribute("allowContentLink", new Boolean("true".equals(allowContentLink)));
     }
 
     public void addProperty(Properties values, RenderRequest request,
@@ -335,7 +343,6 @@ public class IMSBLTIPortlet extends GenericPortlet {
         dPrint("==== doEdit called ====");
 
         PortletSession pSession = request.getPortletSession(true);
-        PortletPreferences prefs = request.getPreferences();
 
 	String title = getTitleString(request);
 	if ( title != null ) response.setTitle(title);
@@ -361,7 +368,6 @@ public class IMSBLTIPortlet extends GenericPortlet {
     public void doHelp(RenderRequest request, RenderResponse response)
             throws PortletException, IOException {
         dPrint("==== doHelp called ====");
-        PortletPreferences prefs = request.getPreferences();
 
 	String title = getTitleString(request);
 	if ( title != null ) response.setTitle(title);
@@ -437,6 +443,7 @@ public class IMSBLTIPortlet extends GenericPortlet {
 		dPrint("Preference removed");
         } catch (ReadOnlyException e) {
 		setErrorMessage(request, rb.getString("error.modify.prefs")) ;
+		return;
         }
         prefs.store();
 
@@ -488,8 +495,6 @@ public class IMSBLTIPortlet extends GenericPortlet {
         if ( imsTIUrl != null && imsTIUrl.trim().length() < 1 ) imsTIUrl = null;
 	String imsTIXml  = getFormParameter(request,sakaiProperties,"xml");
         if ( imsTIXml != null && imsTIXml.trim().length() < 1 ) imsTIXml = null;
-	String imsTISecret  = getFormParameter(request,sakaiProperties,"secret");
-        if ( imsTISecret != null && imsTISecret.trim().length() < 1 ) imsTISecret = null;
 
         // imsType will be null if launch or xml is coming from final properties
         if ( imsType != null ) {
@@ -529,9 +534,11 @@ public class IMSBLTIPortlet extends GenericPortlet {
         String oldPlacementSecret = getSakaiProperty(sakaiProperties,"imsti.placementsecret");
         String allowOutcomes = ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_OUTCOMES_ENABLED, null);
         String allowSettings = ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_SETTINGS_ENABLED, null);
+        String allowRoster = ServerConfigurationService.getString(SakaiBLTIUtil.BASICLTI_ROSTER_ENABLED, null);
 
 	// System.out.println("old placementsecret="+oldPlacementSecret);
-	if ( oldPlacementSecret == null && ("true".equals(allowOutcomes) || "true".equals(allowSettings) ) ) {
+	if ( oldPlacementSecret == null && 
+		("true".equals(allowOutcomes) || "true".equals(allowSettings) || "true".equals(allowRoster) ) ) {
                	try {
 			String uuid = UUID.randomUUID().toString();
 			Date date = new Date();
@@ -543,6 +550,7 @@ public class IMSBLTIPortlet extends GenericPortlet {
                        	changed = true;
                	} catch (ReadOnlyException e) {
                        	setErrorMessage(request, rb.getString("error.modify.prefs") );
+			return;
                	} 
         }
 
@@ -591,6 +599,7 @@ public class IMSBLTIPortlet extends GenericPortlet {
 			SiteService.save(site);
         	} catch (Exception e) {
                		setErrorMessage(request, rb.getString("error.page.title"));
+			return;
 		}
 	}
 
@@ -603,6 +612,7 @@ public class IMSBLTIPortlet extends GenericPortlet {
                         changed = true;
                 } catch (ReadOnlyException e) {
                         setErrorMessage(request, rb.getString("error.modify.prefs") );
+			return;
                 }
         }
 
@@ -701,7 +711,6 @@ public class IMSBLTIPortlet extends GenericPortlet {
 	        String gradebookUid = getContext();
                 if ( ! (g.isGradebookDefined(gradebookUid) && (g.currentUserHasEditPerm(gradebookUid) || g.currentUserHasGradingPerm(gradebookUid)) && g.currentUserHasGradeAllPerm(gradebookUid) ) ) return null;
                 List gradebookAssignments = g.getAssignments(gradebookUid);
-                List gradebookAssignmentsExceptSamigo = new ArrayList();
 
                 // filtering out anything externally provided
                 for (Iterator i=gradebookAssignments.iterator(); i.hasNext();)
