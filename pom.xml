@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.sakaiproject.purepoms</groupId>
         <artifactId>sakai-standard-tool</artifactId>
-        <version>2.7.11</version>
+        <version>2.7.12</version>
     </parent>
     
     <name>BasicLTI base pom (basiclti)</name>
@@ -150,9 +150,9 @@
                 <scope>provided</scope>
             </dependency>
             <dependency>
-      			<groupId>org.sakaiproject.entitybroker</groupId>
-      			<artifactId>entitybroker-utils</artifactId>
-            	<version>1.3.18</version>
+      		<groupId>org.sakaiproject.entitybroker</groupId>
+      		<artifactId>entitybroker-utils</artifactId>
+            	<version>1.3.19</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
