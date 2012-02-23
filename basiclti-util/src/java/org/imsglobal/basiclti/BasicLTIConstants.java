@@ -316,6 +316,16 @@ public class BasicLTIConstants {
   public static final String USER_ID = "user_id";
 
   /**
+   * user_image=http://my.sakai.org/direct/profile/0ae836b9-7fc9-4060-006f-27b2066ac545/image
+   * <p>
+   * This attribute specifies the URI for an image of the user who launched this request.
+   * This image is suitable for use as a "profile picture" or an avatar representing the user.
+   * It is expected to be a relatively small graphic image file using a widely supported image
+   * format (i.e. PNG, JPG, or GIF) with a square aspect ratio. This parameter is optional.
+   */
+  public static final String USER_IMAGE = "user_image";
+
+  /**
    * ext_sakai_provider_eid=jsmith26
    * <p>
    * If set, this will signal that the external application has provided an eid which
@@ -342,5 +352,5 @@ public class BasicLTIConstants {
       RESOURCE_LINK_TITLE, RESOURCE_LINK_DESCRIPTION, ROLES,
       TOOL_CONSUMER_INSTANCE_CONTACT_EMAIL, TOOL_CONSUMER_INSTANCE_DESCRIPTION,
       TOOL_CONSUMER_INSTANCE_GUID, TOOL_CONSUMER_INSTANCE_NAME,
-      TOOL_CONSUMER_INSTANCE_URL, USER_ID };
+      TOOL_CONSUMER_INSTANCE_URL, USER_ID, USER_IMAGE };
 }
