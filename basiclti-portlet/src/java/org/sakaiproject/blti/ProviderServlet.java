@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -52,6 +53,7 @@ import org.sakaiproject.authz.api.SecurityAdvisor;
 import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.event.cover.UsageSessionService;
+import org.sakaiproject.entity.api.ResourcePropertiesEdit;
 import org.sakaiproject.id.cover.IdManager;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.api.SitePage;
@@ -62,6 +64,9 @@ import org.sakaiproject.tool.api.Tool;
 import org.sakaiproject.tool.cover.SessionManager;
 import org.sakaiproject.tool.cover.ToolManager;
 import org.sakaiproject.user.api.User;
+import org.sakaiproject.user.api.Preferences;
+import org.sakaiproject.user.api.PreferencesEdit;
+import org.sakaiproject.user.cover.PreferencesService;
 import org.sakaiproject.user.cover.UserDirectoryService;
 import org.sakaiproject.util.ResourceLoader;
 import org.sakaiproject.basiclti.util.ShaUtil;
@@ -98,6 +103,7 @@ public class ProviderServlet extends HttpServlet {
 	private static Log M_log = LogFactory.getLog(ProviderServlet.class);
 	private static ResourceLoader rb = new ResourceLoader("basiclti");
 	private static final String BASICLTI_RESOURCE_LINK = "blti:resource_link_id";
+    private Map<String,String> defaultCountries = new HashMap<String,String>();
 	/**
 	 * Setup a security advisor.
 	 */
@@ -142,6 +148,10 @@ public class ProviderServlet extends HttpServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
+
+        // BLTI-153. Needed in case two character code is passed. 
+        defaultCountries.put("en","GB");
+        defaultCountries.put("es","ES");
 	}
 
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -422,6 +432,9 @@ public class ProviderServlet extends HttpServlet {
 		} else {
 			User user = null;
 
+            // BLTI-153. We need to differentiate between exising and new users for locale setup purposes
+            boolean justAdded = false;
+
 			try {
 				user = UserDirectoryService.getUserByEid(eid);
 			} catch (Exception e) {
@@ -447,6 +460,32 @@ public class ProviderServlet extends HttpServlet {
 			UsageSessionService.login(user.getId(), eid, ipAddress, null,UsageSessionService.EVENT_LOGIN_WS);
 			sess.setUserId(user.getId());
 			sess.setUserEid(user.getEid());
+
+            // BLTI-153. Set up user's language.
+            String locale = request.getParameter(BasicLTIConstants.LAUNCH_PRESENTATION_LOCALE);
+            if(locale != null && locale.length() > 0) {
+                if(locale.length() == 2) {
+                    locale += "_" + defaultCountries.get(locale);
+                }
+                try {
+                    PreferencesEdit pe = null;
+                    if(justAdded) {
+                        // User added for the first time therefore no current preferences.
+                        pe = PreferencesService.add(user.getId());
+                        pe.getPropertiesEdit("sakai:resourceloader").addProperty(Preferences.FIELD_LOCALE,locale);
+                    } else {
+                        // User already existed therefore edit their current preferences.
+                        // Currently, this doesn't work and I don't know why, the code seems valid - Adrian.
+                        pe = PreferencesService.edit(user.getId());
+                        ResourcePropertiesEdit propsEdit = pe.getPropertiesEdit("sakai:resourceloader");
+                        propsEdit.removeProperty(Preferences.FIELD_LOCALE);
+                        propsEdit.addProperty(Preferences.FIELD_LOCALE,locale);
+                    }
+                    PreferencesService.commit(pe);
+                } catch(Exception e) {
+                    M_log.error("Failed to setup launcher's locale",e);
+                }
+            }
 			
 			// post the login event
 			// eventTrackingService().post(eventTrackingService().newEvent(EVENT_LOGIN,
