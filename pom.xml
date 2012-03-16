@@ -122,14 +122,6 @@
         <url>https://source.sakaiproject.org/svn/basiclti/branches/basiclti-2.0.x</url>
     </scm>
 
-    <distributionManagement>
-        <site>
-            <id>sakai-site</id>
-            <name>Sakai release Site</name>
-            <url>scpexe://source.sakaiproject.org/var/www/html/release/basiclti/${project.version}</url>
-        </site>
-    </distributionManagement>
-    
     <dependencyManagement>
         <dependencies>
             <dependency>
