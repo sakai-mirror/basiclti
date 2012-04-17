@@ -42,8 +42,11 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
+                <sakai.entitybroker.version>1.5-SNAPSHOT</sakai.entitybroker.version>
                 <sakai.velocity.groupId>org.sakaiproject.velocity</sakai.velocity.groupId>
-                <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding> 
+                <sakai.velocity.version>2.9-SNAPSHOT</sakai.velocity.version> 
+                <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                <sakai.edu-services.version>1.2-SNAPSHOT</sakai.edu-services.version>
             </properties>
         </profile>
         <profile>
