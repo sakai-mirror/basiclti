@@ -42,11 +42,15 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-								<sakai.entitybroker.version>${sakai.entitybroker.version}</sakai.entitybroker.version>
+								<!--
+								<sakai.entitybroker.version>1.5-SNAPSHOT</sakai.entitybroker.version>
+								-->
                 <sakai.velocity.groupId>org.sakaiproject.velocity</sakai.velocity.groupId>
 								<sakai.velocity.version>${sakai.velocity-tool.version}</sakai.velocity.version>
                 <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-								<sakai.edu-services.version>${sakai.edu-services.version}</sakai.edu-services.version> 
+								<!--
+								<sakai.edu-services.version>1.2-SNAPSHOT</sakai.edu-services.version> 
+								-->
             </properties>
         </profile>
         <profile>
