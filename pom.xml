@@ -61,9 +61,10 @@
         </profile>
 				<profile>
 						<id>sonatype-oss-release</id>
+						<properties>
                 <sakai.velocity.groupId>org.sakaiproject.velocity</sakai.velocity.groupId>
                 <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-						</id>
+						</properties>
 				</profile>
     </profiles>
     
