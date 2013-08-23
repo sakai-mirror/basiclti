@@ -551,169 +551,6 @@ public class LTIAdminTool extends VelocityPortletPaneledAction
 		switchPanel(state, "ToolSystem");
 	}
 
-	/**
-	 * Setup the velocity context and choose the template for options.
-	 */
-	public String buildMappingPanelContext(VelocityPortlet portlet, Context context, 
-			RunData data, SessionState state)
-	{
-		context.put("tlang", rb);
-		if ( ! ltiService.isAdmin() ) {
-			addAlert(state,rb.getString("error.admin.view"));
-			return "lti_error";
-		}
-		List<Map<String,Object>> mappings = ltiService.getMappings(null,null,0,100);
-		context.put("mappings", mappings);
-		context.put("messageSuccess",state.getAttribute(STATE_SUCCESS));
-		state.removeAttribute(STATE_SUCCESS);
-		return "lti_mapping";
-	}
-
-	public String buildMappingInsertPanelContext(VelocityPortlet portlet, Context context, 
-			RunData data, SessionState state)
-	{
-		context.put("tlang", rb);
-		if ( ! ltiService.isAdmin() ) {
-			addAlert(state,rb.getString("error.admin.edit"));
-			return "lti_error";
-		}
-		context.put("doMappingAction", BUTTON + "doMappingPut");
-		context.put("messageSuccess",state.getAttribute(STATE_SUCCESS));
-		state.removeAttribute(STATE_SUCCESS);
-		String [] mappingForm = ltiService.getMappingModel();
-		Properties previousPost = (Properties) state.getAttribute(STATE_POST);
-		String formInput = ltiService.formInput(previousPost, mappingForm);
-		context.put("formInput",formInput);
-		return "lti_mapping_insert";
-	}
-
-	public String buildMappingEditPanelContext(VelocityPortlet portlet, Context context, 
-			RunData data, SessionState state)
-	{
-		String stateId = (String) state.getAttribute(STATE_ID);
-		state.removeAttribute(STATE_ID);
-
-		context.put("tlang", rb);
-		if ( ! ltiService.isAdmin() ) {
-			addAlert(state,rb.getString("error.admin.edit"));
-			return "lti_error";
-		}
-		context.put("doMappingAction", BUTTON + "doMappingPut");
-		context.put("messageSuccess",state.getAttribute(STATE_SUCCESS));
-		String [] mappingForm = ltiService.getMappingModel();
-		String id = data.getParameters().getString(LTIService.LTI_ID);
-		if ( id == null ) id = stateId;
-		if ( id == null ) {
-			addAlert(state,rb.getString("error.id.not.found"));
-			return "lti_mapping";
-		}
-		Long key = new Long(id);
-		Map<String,Object> mapping = ltiService.getMapping(key);
-		if (  mapping == null ) return "lti_main";		
-		String formInput = ltiService.formInput(mapping, mappingForm);
-		context.put("formInput", formInput);
-		state.removeAttribute(STATE_SUCCESS);
-		return "lti_mapping_insert";
-	}
-
-	public String buildMappingDeletePanelContext(VelocityPortlet portlet, Context context, 
-			RunData data, SessionState state)
-	{
-		context.put("tlang", rb);
-		if ( ! ltiService.isAdmin() ) {
-			addAlert(state,rb.getString("error.admin.delete"));
-			return "lti_error";
-		}
-		context.put("doToolAction", BUTTON + "doMappingDelete");
-		String [] mappingForm = ltiService.getMappingModel();
-		String id = data.getParameters().getString(LTIService.LTI_ID);
-		if ( id == null ) {
-			addAlert(state,rb.getString("error.id.not.found"));
-			return "lti_mapping";
-		}
-		Long key = new Long(id);
-
-		Map<String,Object> mapping = ltiService.getMapping(key);
-
-		if (  mapping == null ) {
-			addAlert(state,rb.getString("error.mapping.not.found"));
-			return "lti_mapping";
-		}
-		String formOutput = ltiService.formOutput(mapping, mappingForm);
-		context.put("formOutput", formOutput);
-		context.put("mapping",mapping);
-		state.removeAttribute(STATE_SUCCESS);
-		return "lti_mapping_delete";
-	}
-
-	// Insert or edit
-	public void doMappingPut(RunData data, Context context)
-	{
-
-		String peid = ((JetspeedRunData) data).getJs_peid();
-		SessionState state = ((JetspeedRunData) data).getPortletSessionState(peid);
-
-		if ( ! ltiService.isAdmin() ) {
-			addAlert(state,rb.getString("error.admin.edit"));
-			switchPanel(state,"Error");
-			return;
-		}
-		Properties reqProps = data.getParameters().getProperties();
-		String id = data.getParameters().getString(LTIService.LTI_ID);
-		Object retval = null;
-		String success = null;
-		if ( id == null ) 
-		{
-			retval = ltiService.insertMapping(reqProps);
-			success = rb.getString("success.created");
-		} else {
-			Long key = new Long(id);
-			retval = ltiService.updateMapping(key, reqProps);
-			success = rb.getString("success.updated");
-		}
-
-		if ( retval instanceof String ) 
-		{
-			state.setAttribute(STATE_POST,reqProps);
-			addAlert(state, (String) retval);
-			state.setAttribute(STATE_ID,id);
-			return;
-		}
-
-		state.setAttribute(STATE_SUCCESS,success);
-		switchPanel(state, "Mapping");
-	}
-
-	public void doMappingDelete(RunData data, Context context)
-	{
-
-		String peid = ((JetspeedRunData) data).getJs_peid();
-		SessionState state = ((JetspeedRunData) data).getPortletSessionState(peid);
-
-		if ( ! ltiService.isAdmin() ) {
-			addAlert(state,rb.getString("error.admin.delete"));
-			switchPanel(state,"Error");
-			return;
-		}
-		Properties reqProps = data.getParameters().getProperties();
-		String id = data.getParameters().getString(LTIService.LTI_ID);
-		Object retval = null;
-		if ( id == null ) {
-			addAlert(state,rb.getString("error.id.not.found"));
-			switchPanel(state, "Mapping");
-			return;
-		}
-		Long key = new Long(id);
-		if ( ltiService.deleteMapping(key) )
-		{
-			state.setAttribute(STATE_SUCCESS,rb.getString("success.deleted"));
-			switchPanel(state, "Mapping");
-		} else {
-			addAlert(state,rb.getString("error.delete.fail"));
-			switchPanel(state, "Mapping");
-		}
-	}
-
 	/** Content related methods ------------------------------ */
 
 	public String buildContentPanelContext(VelocityPortlet portlet, Context context, 
@@ -859,9 +696,10 @@ public class LTIAdminTool extends VelocityPortletPaneledAction
 		Properties reqProps = data.getParameters().getProperties();
 		String id = data.getParameters().getString(LTIService.LTI_ID);
 		String toolId = data.getParameters().getString(LTIService.LTI_TOOL_ID);
-		String title = data.getParameters().getString(LTIService.LTI_PAGETITLE);
 		Object retval = ltiService.insertToolContent(id, toolId, reqProps);
 		
+		Long contentKey = null;
+		Map<String,Object> content = null;
 		if ( retval instanceof String ) 
 		{
 			addAlert(state, (String) retval);
@@ -878,15 +716,22 @@ public class LTIAdminTool extends VelocityPortletPaneledAction
 		{
 			// the return value is the content key Long value
 			id = ((Long) retval).toString();
+			contentKey = new Long(id);
+			content = ltiService.getContent(contentKey);
+			if ( content == null ) {
+				addAlert(state, rb.getString("error.content.not.found"));
+				switchPanel(state, "Error");
+				state.setAttribute(STATE_POST,reqProps);
+				state.setAttribute(STATE_CONTENT_ID,id);
+				return;
+			}
 		}
 
 		String returnUrl = reqProps.getProperty("returnUrl");
 		if ( returnUrl != null )
 		{
 			if ( id != null ) {
-				Long contentKey = new Long(id);
 				if ( returnUrl.startsWith("about:blank") ) { // Redirect to the item
-					Map<String,Object> content = ltiService.getContent(contentKey);
 					if ( content != null ) {
 						String launch = (String) ltiService.getContentLaunch(content);
 						if ( launch != null ) returnUrl = launch;
@@ -914,6 +759,15 @@ public class LTIAdminTool extends VelocityPortletPaneledAction
 		}
 		state.setAttribute(STATE_SUCCESS,success);
 		
+		String title = data.getParameters().getString(LTIService.LTI_PAGETITLE);
+
+		// Take the title from the content (or tool) definition
+		if (title == null || title.trim().length() < 1 ) {
+			if ( content != null ) {
+				title = (String) content.get(ltiService.LTI_PAGETITLE);
+			}
+		}
+
 		if (reqProps.getProperty("add_site_link") != null)
 		{
 			// this is to add site link:
