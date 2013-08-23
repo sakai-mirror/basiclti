@@ -29,12 +29,12 @@ if (get_magic_quotes_gpc()) $sourcedid = stripslashes($sourcedid);
 ?>
 <p>
 <form method="POST">
-Service URL: <input type="text" name="url" size="100" disabled="true" value="<?php echo(htmlentities($_REQUEST['url']));?>"/></br>
-lis_result_sourcedid: <input type="text" name="sourcedid" disabled="true" size="100" value="<?php echo(htmlentities($sourcedid));?>"/></br>
-OAuth Consumer Key: <input type="text" name="key" disabled="true" size="80" value="<?php echo(htmlentities($_REQUEST['key']));?>"/></br>
-OAuth Consumer Secret: <input type="text" name="secret" size="80" value="<?php echo(htmlentities($oauth_consumer_secret));?>"/></br>
+Service URL: <input type="text" name="url" size="100" disabled="true" value="<?php echo(htmlent_utf8($_REQUEST['url']));?>"/></br>
+lis_result_sourcedid: <input type="text" name="sourcedid" disabled="true" size="100" value="<?php echo(htmlent_utf8($sourcedid));?>"/></br>
+OAuth Consumer Key: <input type="text" name="key" disabled="true" size="80" value="<?php echo(htmlent_utf8($_REQUEST['key']));?>"/></br>
+OAuth Consumer Secret: <input type="text" name="secret" size="80" value="<?php echo(htmlent_utf8($oauth_consumer_secret));?>"/></br>
 </p><p>
-Grade to Send to LMS: <input type="text" name="grade" value="<?php echo(htmlentities($_REQUEST['grade']));?>"/>
+Grade to Send to LMS: <input type="text" name="grade" value="<?php echo(htmlent_utf8($_REQUEST['grade']));?>"/>
 (i.e. 0.95)<br/>
 <input type='submit' name='submit' value="Send Grade">
 <input type='submit' name='submit' value="Read Grade">
@@ -63,6 +63,8 @@ $method="POST";
 $endpoint = $_REQUEST['url'];
 $content_type = "application/xml";
 
+$sourcedid = htmlspec_utf8($sourcedid);
+
 if ( $_REQUEST['submit'] == "Send Grade" && isset($_REQUEST['grade'] ) ) {
     $operation = 'replaceResultRequest';
     $postBody = str_replace(
@@ -89,6 +91,8 @@ $response = sendOAuthBodyPOST($method, $endpoint, $oauth_consumer_key, $oauth_co
 global $LastOAuthBodyBaseString;
 $lbs = $LastOAuthBodyBaseString;
 
+global $LastPOSTHeader;
+$lph = $LastPOSTHeader;
 
 try { 
     $retval = parseResponse($response);
@@ -98,7 +102,7 @@ try {
 
 echo("\n<pre>\n");
 echo("Service Url:\n");
-echo(htmlentities($endpoint)."\n\n");
+echo(htmlent_utf8($endpoint)."\n\n");
 print_r($retval);
 echo("\n");
 echo("------------ POST RETURNS ------------\n");
@@ -108,10 +112,14 @@ $response = str_replace(">","&gt;",$response);
 echo($response);
 
 echo("\n\n------------ WE SENT ------------\n");
+global $LastPOSTMethod;
+echo("Post implementation:".$LastPOSTMethod."\n");
+print_r($lph);
+echo("\n");
 $postBody = str_replace("<","&lt;",$postBody);
 $postBody = str_replace(">","&gt;",$postBody);
 echo($postBody);
-echo("\nBase String:\n");
+echo("\n\nBase String:\n");
 echo($lbs);
 echo("\n</pre>\n");
 
