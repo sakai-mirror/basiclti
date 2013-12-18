@@ -13,7 +13,7 @@
     <name>BasicLTI base pom (basiclti)</name>
     <groupId>org.sakaiproject.basiclti</groupId>
     <artifactId>basiclti</artifactId>
-    <version>2.1.1</version>
+    <version>2.1.2-SNAPSHOT</version>
     <organization>
         <name>Sakai Project</name>
         <url>http://sakaiproject.org/</url>
@@ -51,7 +51,7 @@
         <profile>
             <id>sakai-2.9</id>
             <properties>
-                <sakai.entitybroker.version>1.5-SNAPSHOT</sakai.entitybroker.version>
+                <sakai.entitybroker.version>1.5.3</sakai.entitybroker.version>
                 <sakai.velocity.groupId>org.sakaiproject.velocity</sakai.velocity.groupId>
                 <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
             </properties>
