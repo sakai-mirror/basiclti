@@ -136,9 +136,9 @@
     </developers>
 
     <scm>
-        <connection>scm:svn:https://source.sakaiproject.org/svn/basiclti/tags/basiclti-2.1.1</connection>
-        <developerConnection>scm:svn:https://source.sakaiproject.org/svn/basiclti/tags/basiclti-2.1.1</developerConnection>
-        <url>https://source.sakaiproject.org/svn/basiclti/tags/basiclti-2.1.1</url>
+        <connection>scm:svn:https://source.sakaiproject.org/svn/basiclti/branches/basiclti-2.1.2-madiba</connection>
+        <developerConnection>scm:svn:https://source.sakaiproject.org/svn/basiclti/branches/basiclti-2.1.2-madiba</developerConnection>
+        <url>https://source.sakaiproject.org/svn/basiclti/branches/basiclti-2.1.2-madiba</url>
     </scm>
 
     <dependencyManagement>
