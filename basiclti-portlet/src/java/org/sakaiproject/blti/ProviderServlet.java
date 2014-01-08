@@ -20,12 +20,24 @@
 package org.sakaiproject.blti;
 
 import java.lang.reflect.Method;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.DataOutputStream;
+import java.io.FilterReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.util.*;
+
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -44,6 +56,8 @@ import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.authz.api.Role;
 import org.sakaiproject.authz.api.SecurityAdvisor;
 import org.sakaiproject.authz.cover.SecurityService;
+import org.sakaiproject.basiclti.util.SakaiBLTIUtil;
+import org.sakaiproject.blti.extensions.POXMembershipsResponse;
 import org.sakaiproject.lti.api.BLTIProcessor;
 import org.sakaiproject.lti.api.LTIException;
 import org.sakaiproject.basiclti.util.ShaUtil;
@@ -54,6 +68,7 @@ import org.sakaiproject.event.api.NotificationService;
 import org.sakaiproject.event.cover.UsageSessionService;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.id.cover.IdManager;
+import org.sakaiproject.site.api.Group;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.api.SitePage;
 import org.sakaiproject.site.api.ToolConfiguration;
@@ -278,13 +293,19 @@ public class ProviderServlet extends HttpServlet {
 
             Site site = findOrCreateSite(payload, isTrustedConsumer);
 
-            setupUserEmailPreferenceForSite(payload, user, site, isTrustedConsumer);
-
             invokeProcessors(payload, isTrustedConsumer, ProcessingState.afterSiteCreation, user, site);
+
+            setupUserEmailPreferenceForSite(payload, user, site, isTrustedConsumer);
 
             site = addOrUpdateSiteMembership(payload, isTrustedConsumer, user, site);
 
             invokeProcessors(payload, isTrustedConsumer, ProcessingState.afterSiteMembership, user, site);
+
+            // If the consumer is trusted, we don't need to pull the memberships in. They should already
+            // be mirrored in both systems.
+            if(!isTrustedConsumer) {
+                synchronizeSiteMemberships(payload, site);
+            }
 
             String toolPlacementId = addOrCreateTool(payload, isTrustedConsumer, user, site);
 
@@ -511,8 +532,7 @@ public class ProviderServlet extends HttpServlet {
 
 
           // Lookup the secret
-          final String configPrefix = "basiclti.provider." + oauth_consumer_key + ".";
-          final String oauth_secret = ServerConfigurationService.getString(configPrefix+ "secret", null);
+          final String oauth_secret = getSecret(oauth_consumer_key);
           if (oauth_secret == null) {
               throw new LTIException( "launch.key.notfound",oauth_consumer_key, null);
           }
@@ -875,6 +895,257 @@ public class ProviderServlet extends HttpServlet {
 		}
     }
 
+    private final void synchronizeSiteMemberships(Map payload, Site site) throws LTIException {
+
+        if(M_log.isDebugEnabled()) M_log.debug("synchronizeSiteMemberships");
+
+        if(!ServerConfigurationService.getBoolean(SakaiBLTIUtil.INCOMING_ROSTER_ENABLED, false)) {
+            M_log.info("LTI Memberships synchronization disabled.");
+            return;
+        }
+
+        String membershipsUrl = (String) payload.get("ext_ims_lis_memberships_url");
+
+        if (!BasicLTIUtil.isNotBlank(membershipsUrl)) {
+            M_log.info("LTI Memberships extension is not supported.");
+            return;
+        }
+
+        if(M_log.isDebugEnabled()) M_log.debug("Memberships URL: " + membershipsUrl);
+
+        String membershipsId = (String) payload.get("ext_ims_lis_memberships_id");
+
+        if (!BasicLTIUtil.isNotBlank(membershipsId)) {
+            M_log.info("No memberships id supplied. Memberships will NOT be synchronized.");
+            return;
+        }
+
+        // Check for moodle lms. This could be either basiclti4moodle or core lti. We
+        // need to know which, as the calling semantics differ.
+        String lms = (String) payload.get("ext_lms");
+        if (BasicLTIUtil.isNotBlank(lms) && lms.equals("moodle-2")) {
+
+            M_log.debug("This memberships service is provided by a Moodle variant. Checking the version ...");
+
+            String version = (String) payload.get("tool_consumer_info_version");
+            if (BasicLTIUtil.isNotBlank(version)) {
+
+                if(version.startsWith("2013")) {
+                    M_log.debug("The launching Moodle is >= v2.5. Assuming POX based services ...");
+                    // This is probably core lti with POX based services
+                    synchronizeSiteMembershipsFromMoodle2(payload, site);
+                } else if(version.startsWith("2007")) {
+                    M_log.debug("The launching Moodle is <= v1.9. Assuming basiclti4moodle ...");
+                    // This is probably basiclti4moodle
+                    synchronizeLTI1SiteMemberships(payload, site);
+                }
+            } else {
+                M_log.debug("The version is blank. Assuming basiclti4moodle ...");
+                // This is probably basiclti4moodle
+                synchronizeLTI1SiteMemberships(payload, site);
+            }
+        }
+    }
+
+    private final void synchronizeSiteMembershipsFromMoodle2(final Map payload, final Site site) {
+
+        final String membershipsId = (String) payload.get("ext_ims_lis_memberships_id");
+        final String membershipsUrl = (String) payload.get("ext_ims_lis_memberships_url");
+        final String oauth_consumer_key = (String) payload.get("oauth_consumer_key");
+        final String oauth_secret = getSecret(oauth_consumer_key);
+
+        String type = "readMembershipsWithGroups";
+        String uuid = UUID.randomUUID().toString();
+        String xml = "<sourcedId>" + membershipsId + "</sourcedId>";
+
+        StringBuilder sb = new StringBuilder("<?xml version = \"1.0\" encoding = \"UTF-8\"?>");
+        sb.append("<imsx_POXEnvelope xmlns = \"http://www.imsglobal.org/services/ltiv1p1/xsd/imsoms_v1p0\">");
+        sb.append("<imsx_POXHeader>");
+        sb.append("<imsx_POXRequestHeaderInfo>");
+        sb.append("<imsx_version>V1.0</imsx_version>");
+        sb.append("<imsx_messageIdentifier>" + uuid + "</imsx_messageIdentifier>");
+        sb.append("</imsx_POXRequestHeaderInfo>");
+        sb.append("</imsx_POXHeader>");
+        sb.append("<imsx_POXBody>");
+        sb.append("<" + type + "Request>");
+        sb.append(xml);
+        sb.append("</" + type + "Request>");
+        sb.append("</imsx_POXBody>");
+        sb.append("</imsx_POXEnvelope>");
+
+        String callXml = sb.toString();
+
+        if(M_log.isDebugEnabled()) M_log.debug("callXml: " + callXml);
+
+        String bodyHash = OAuthSignatureMethod.base64Encode(ShaUtil.sha1(callXml));
+        M_log.debug(bodyHash);
+
+        OAuthMessage om = new OAuthMessage("POST", membershipsUrl, null);
+        om.addParameter("oauth_body_hash", bodyHash);
+        om.addParameter("oauth_consumer_key", oauth_consumer_key);
+        om.addParameter("oauth_signature_method", "HMAC-SHA1");
+        om.addParameter("oauth_version", "1.0");
+        om.addParameter("oauth_timestamp", new Long(new Date().getTime()).toString());
+
+        OAuthConsumer oc = new OAuthConsumer(null, oauth_consumer_key, oauth_secret, null);
+
+        try {
+            OAuthSignatureMethod osm = OAuthSignatureMethod.newMethod("HMAC-SHA1",new OAuthAccessor(oc));
+            osm.sign(om);
+
+            String authzHeader = om.getAuthorizationHeader(null);
+
+            if(M_log.isDebugEnabled()) M_log.debug("AUTHZ HEADER: " + authzHeader);
+
+            URL url = new URL(membershipsUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoOutput(true);
+            connection.setDoInput(true);
+            connection.setInstanceFollowRedirects(false); 
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Authorization", authzHeader);
+            connection.setRequestProperty("Content-Length", "" + Integer.toString(callXml.getBytes().length));
+            connection.setRequestProperty("Content-Type", "text/xml");
+            connection.setUseCaches (false);
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(connection.getOutputStream()));
+            bw.write(callXml);
+            bw.flush();
+            bw.close();
+
+            processMembershipsResponse(connection, payload, site);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private final void synchronizeLTI1SiteMemberships(final Map payload, final Site site) {
+
+        final String membershipsId = (String) payload.get("ext_ims_lis_memberships_id");
+        final String membershipsUrl = (String) payload.get("ext_ims_lis_memberships_url");
+        final String oauth_consumer_key = (String) payload.get("oauth_consumer_key");
+        final String oauth_secret = getSecret(oauth_consumer_key);
+
+        OAuthMessage om = new OAuthMessage("POST", membershipsUrl, null);
+        om.addParameter("oauth_consumer_key", oauth_consumer_key);
+        om.addParameter("oauth_signature_method", "HMAC-SHA1");
+        om.addParameter("oauth_version", "1.0");
+        om.addParameter("oauth_timestamp", new Long(new Date().getTime()).toString());
+        om.addParameter("lti_message_type", "basic-lis-readmembershipsforcontext");
+        om.addParameter("lti_version", "LTI-1p0");
+        om.addParameter("id", membershipsId);
+
+        OAuthConsumer oc = new OAuthConsumer(null, oauth_consumer_key, oauth_secret, null);
+
+        try {
+            OAuthSignatureMethod osm = OAuthSignatureMethod.newMethod("HMAC-SHA1",new OAuthAccessor(oc));
+            osm.sign(om);
+
+            URL url = new URL(membershipsUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoOutput(true);
+            connection.setDoInput(true);
+            connection.setInstanceFollowRedirects(false); 
+            connection.setRequestMethod("POST");
+            connection.setUseCaches (false);
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(connection.getOutputStream()));
+            bw.write(OAuth.formEncode(om.getParameters()));
+            bw.flush();
+            bw.close();
+
+            processMembershipsResponse(connection, payload, site);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void processMembershipsResponse(HttpURLConnection connection, Map payload, Site site) throws Exception {
+
+        M_log.debug("processMembershipsResponse");
+
+        POXMembershipsResponse poxMembershipsResponse
+            = new POXMembershipsResponse(new BufferedReader(new InputStreamReader(connection.getInputStream())));
+
+        connection.disconnect();
+
+        List<POXMembershipsResponse.Member> members = poxMembershipsResponse.getMembers();
+
+        Map<String,List<POXMembershipsResponse.Member>> consumerGroups = poxMembershipsResponse.getGroups();
+
+        if (M_log.isDebugEnabled()) {
+            for (POXMembershipsResponse.Member member : members) {
+                M_log.debug("Member:");
+                M_log.debug("\tUser ID: " + member.userId);
+                M_log.debug("\tFirst Name: " + member.firstName);
+                M_log.debug("\tLast Name: " + member.lastName);
+                M_log.debug("\tEmail: " + member.email);
+                M_log.debug("\tRole: " + member.role);
+            }
+
+            for (String groupTitle : consumerGroups.keySet()) {
+                M_log.debug("Group: " + groupTitle);
+                for(POXMembershipsResponse.Member groupMember : consumerGroups.get(groupTitle)) {
+                    M_log.debug("\tGroup Member ID: " + groupMember.userId);
+                }
+            }
+        }
+
+        for (POXMembershipsResponse.Member member : members) {
+
+            Map map = new HashMap();
+            map.put(BasicLTIConstants.USER_ID, member.userId);
+            map.put(BasicLTIConstants.LIS_PERSON_NAME_GIVEN, member.firstName);
+            map.put(BasicLTIConstants.LIS_PERSON_NAME_FAMILY, member.lastName);
+            map.put(BasicLTIConstants.LIS_PERSON_CONTACT_EMAIL_PRIMARY, member.email);
+            map.put(BasicLTIConstants.ROLES, member.role);
+            map.put("oauth_consumer_key", (String) payload.get("oauth_consumer_key"));
+            map.put(BasicLTIConstants.EXT_SAKAI_PROVIDER_EID, (String) payload.get(BasicLTIConstants.EXT_SAKAI_PROVIDER_EID));
+            map.put("tool_id", (String) payload.get("tool_id"));
+
+            User user = findOrCreateUser(map, false);
+            member.userId = user.getId();
+            addOrUpdateSiteMembership(map, false, user, site);
+        }
+
+        Collection sakaiGroups = site.getGroups();
+
+        for (String consumerGroupTitle : consumerGroups.keySet()) {
+            M_log.debug("Processing consumer group '" + consumerGroupTitle + "' ...");
+            Group sakaiGroup = null;
+            // See if the group exists already
+            for (Iterator i = sakaiGroups.iterator();i.hasNext();) {
+                Group currentSakaiGroup = (Group) i.next();
+                if (consumerGroupTitle.equals(currentSakaiGroup.getTitle())) {
+                    sakaiGroup = currentSakaiGroup;
+                    break;
+                }
+            }
+
+            if (sakaiGroup == null) {
+                // New group. Create it.
+                if (M_log.isDebugEnabled()) M_log.debug("Creating group with title '" + consumerGroupTitle + "' ...");
+                sakaiGroup = site.addGroup();
+                sakaiGroup.getProperties().addProperty(sakaiGroup.GROUP_PROP_WSETUP_CREATED, Boolean.TRUE.toString());
+                sakaiGroup.setTitle(consumerGroupTitle);
+
+            } else {
+                M_log.debug("Existing group. Removing current membership ...");
+                sakaiGroup.removeMembers();
+            }
+
+            for (POXMembershipsResponse.Member consumerGroupMember : consumerGroups.get(consumerGroupTitle)) {
+                if (M_log.isDebugEnabled()) M_log.debug("Adding '" + consumerGroupMember.firstName + " " + consumerGroupMember.lastName + "' to '" + consumerGroupTitle + "' ...");
+                sakaiGroup.addMember(consumerGroupMember.userId,consumerGroupMember.role,true,false);
+            }
+
+            try {
+                SiteService.save(site);
+                M_log.info("Updated  site=" + site.getId() + " group=" + consumerGroupTitle);
+            } catch (Exception e) {
+                M_log.warn("Failed to add group '" + consumerGroupTitle + "' to site");
+            }
+        }
+    }
+
     private final void updateSiteDetailsIfChanged(Site site, String context_title, String context_label) {
 
         boolean changed = false;
@@ -1164,4 +1435,10 @@ public class ProviderServlet extends HttpServlet {
 
 		return null;
 	}
+
+    private String getSecret(String oauth_consumer_key) {
+
+        final String configPrefix = "basiclti.provider." + oauth_consumer_key + ".";
+        return ServerConfigurationService.getString(configPrefix + "secret", null);
+    }
 }
