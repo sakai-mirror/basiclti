@@ -1205,6 +1205,15 @@ System.out.println("newTool="+newTool);
                 addAlert(state,rb.getString("error.tool.not.found"));	 
                 return "lti_error";	 
         }	 
+
+        if (previousData == null) {
+        	Properties defaultData = new Properties();
+        	defaultData.put("title",tool.get(LTIService.LTI_TITLE));
+        	defaultData.put("pagetitle",tool.get(LTIService.LTI_PAGETITLE));
+        	previousData = defaultData;
+        	
+        }
+        
         String formInput = ltiService.formInput(previousData, contentForm);	 
 
         context.put("formInput",formInput);
@@ -1242,7 +1251,20 @@ System.out.println("newTool="+newTool);
 		}
 		else if ( retval instanceof Boolean )
 		{
-			// TODO: returns boolean
+			//If it's true retrieve the previous content?
+			if ((Boolean) retval == true) {
+				content = ltiService.getContent(Long.parseLong(id));
+				if ( content == null ) {
+					addAlert(state, rb.getString("error.content.not.found"));
+					switchPanel(state, "Error");
+					state.setAttribute(STATE_POST,reqProps);
+					state.setAttribute(STATE_CONTENT_ID,id);
+					return;
+				}
+			} else {
+				// TODO: returns false, should it do anyhing else? 
+				M_log.error("insertToolContent returned false for" + id);
+			}
 		}
 		else
 		{
