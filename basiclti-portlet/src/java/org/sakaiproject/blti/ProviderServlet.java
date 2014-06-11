@@ -291,7 +291,7 @@ public class ProviderServlet extends HttpServlet {
             
             invokeProcessors(payload, isTrustedConsumer, ProcessingState.afterLogin, user);
 
-            Site site = findOrCreateSite(payload, isTrustedConsumer);
+            Site site = findOrCreateSiteAndMaybeSyncMemberships(payload, isTrustedConsumer);
 
             invokeProcessors(payload, isTrustedConsumer, ProcessingState.afterSiteCreation, user, site);
 
@@ -303,14 +303,13 @@ public class ProviderServlet extends HttpServlet {
 
             // If the consumer is trusted, we don't need to pull the memberships in. They should already
             // be mirrored in both systems.
-            if(!isTrustedConsumer) {
-                synchronizeSiteMemberships(payload, site);
-            }
+            //if(!isTrustedConsumer) {
+            //    synchronizeSiteMemberships(payload, site);
+            //}
 
             String toolPlacementId = addOrCreateTool(payload, isTrustedConsumer, user, site);
 
             invokeProcessors(payload, isTrustedConsumer, ProcessingState.beforeLaunch, user, site);
-
 
             // Construct a URL to this tool
             StringBuilder url = new StringBuilder();
@@ -778,7 +777,7 @@ public class ProviderServlet extends HttpServlet {
         return site;
     }
 
-    protected Site findOrCreateSite(Map payload, boolean trustedConsumer) throws LTIException {
+    protected Site findOrCreateSiteAndMaybeSyncMemberships(Map payload, boolean trustedConsumer) throws LTIException {
 
         String context_id = (String) payload.get(BasicLTIConstants.CONTEXT_ID);
         String oauth_consumer_key = (String) payload.get("oauth_consumer_key");
@@ -875,6 +874,9 @@ public class ProviderServlet extends HttpServlet {
                 try {
                     SiteService.save(site);
                     M_log.info("Created  site=" + siteId + " label=" + context_label + " type=" + sakai_type + " title=" + context_title);
+
+                    // Now sync the site memberships
+                    synchronizeSiteMemberships(payload, site);
 
                 } catch (Exception e) {
                     throw new LTIException("launch.site.save", "siteId=" + siteId, e);
