@@ -116,6 +116,8 @@ public class ProviderServlet extends HttpServlet {
 	private static ResourceLoader rb = new ResourceLoader("basiclti");
 	private static final String BASICLTI_RESOURCE_LINK = "blti:resource_link_id";
     private static final String LTI_CONTEXT_ID = "lti_context_id";
+
+    private LTIService ltiService = null;
     
     private Object profileImageLogicObject = null;
     private Method saveOfficialImageUrlMethod = null;
@@ -176,6 +178,9 @@ public class ProviderServlet extends HttpServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
+
+        ltiService = ComponentManager.getInstance().get("org.sakaiproject.lti.api.LTIService");
+
         ApplicationContext ac = WebApplicationContextUtils.getWebApplicationContext(config.getServletContext());
 
         // load all instance of BLTIProcessor in component mgr by type detection
@@ -300,12 +305,6 @@ public class ProviderServlet extends HttpServlet {
             site = addOrUpdateSiteMembership(payload, isTrustedConsumer, user, site);
 
             invokeProcessors(payload, isTrustedConsumer, ProcessingState.afterSiteMembership, user, site);
-
-            // If the consumer is trusted, we don't need to pull the memberships in. They should already
-            // be mirrored in both systems.
-            //if(!isTrustedConsumer) {
-            //    synchronizeSiteMemberships(payload, site);
-            //}
 
             String toolPlacementId = addOrCreateTool(payload, isTrustedConsumer, user, site);
 
@@ -877,6 +876,8 @@ public class ProviderServlet extends HttpServlet {
 
                     // Now sync the site memberships
                     synchronizeSiteMemberships(payload, site);
+
+                    // Add an entry in the Quartz job table
 
                 } catch (Exception e) {
                     throw new LTIException("launch.site.save", "siteId=" + siteId, e);

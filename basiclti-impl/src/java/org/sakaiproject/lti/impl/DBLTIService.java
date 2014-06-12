@@ -121,10 +121,22 @@ public class DBLTIService extends BaseLTIService implements LTIService {
 			foorm.autoDDL("lti_tools", LTIService.TOOL_MODEL, m_sql, m_autoDdl, doReset, M_log);
 			foorm.autoDDL("lti_deploy", LTIService.DEPLOY_MODEL, m_sql, m_autoDdl, doReset, M_log);
 			foorm.autoDDL("lti_binding", LTIService.BINDING_MODEL, m_sql, m_autoDdl, doReset, M_log);
+			foorm.autoDDL("lti_memberships_jobs", LTIService.MEMBERSHIPS_JOBS_MODEL, m_sql, m_autoDdl, doReset, M_log);
 			super.init();
 		} catch (Exception t) {
 			M_log.warn("init(): ", t);
 		}
+	}
+
+	/**
+	 * 
+	 */
+	public Object insertMembershipsJobDao(String siteId, String membershipsUrl) {
+
+        Map<String, Object> props = new ArrayList<String, Object>();
+        props.put(LTI_SITE_ID, siteId);
+        props.put("memberships_url", memberships_url);
+		return insertThingDao("lti_memberships_jobs", LTIService.MEMBERSHIPS_JOBS_MODEL, null, props, siteId, false, false);
 	}
 
 	/**

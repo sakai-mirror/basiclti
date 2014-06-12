@@ -55,6 +55,15 @@ public interface LTIService {
 	 */
 	public boolean isMaintain();
 
+    /**
+     * Adds a memberships job. Quartz uses these to sync memberships for LTI
+     * sites
+     *
+	 * @param newProps
+	 * @return
+     */
+	public Object insertMembershipsJob(String siteId, String membershipsUrl);
+
 	/**
 	 * 
 	 * @return
@@ -582,6 +591,10 @@ public interface LTIService {
 		"settings:text:hidden=true:maxlength=8096",
 		"created_at:autodate",
 		"updated_at:autodate" };
+
+	static String[] MEMBERSHIPS_JOBS_MODEL = { 
+		"SITE_ID:text:maxlength=99:role=admin",
+		"memberships_url:text:maxlength=4000" };
 
 	/** Static constants for data fields */
 
