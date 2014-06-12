@@ -133,9 +133,9 @@ public class DBLTIService extends BaseLTIService implements LTIService {
 	 */
 	public Object insertMembershipsJobDao(String siteId, String membershipsUrl) {
 
-        Map<String, Object> props = new ArrayList<String, Object>();
+        Map<String, Object> props = new HashMap<String, Object>();
         props.put(LTI_SITE_ID, siteId);
-        props.put("memberships_url", memberships_url);
+        props.put("memberships_url", membershipsUrl);
 		return insertThingDao("lti_memberships_jobs", LTIService.MEMBERSHIPS_JOBS_MODEL, null, props, siteId, false, false);
 	}
 

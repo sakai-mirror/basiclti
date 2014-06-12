@@ -60,6 +60,7 @@ import org.sakaiproject.basiclti.util.SakaiBLTIUtil;
 import org.sakaiproject.blti.extensions.POXMembershipsResponse;
 import org.sakaiproject.lti.api.BLTIProcessor;
 import org.sakaiproject.lti.api.LTIException;
+import org.sakaiproject.lti.api.LTIService;
 import org.sakaiproject.basiclti.util.ShaUtil;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.component.cover.ServerConfigurationService;
@@ -179,7 +180,7 @@ public class ProviderServlet extends HttpServlet {
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 
-        ltiService = ComponentManager.getInstance().get("org.sakaiproject.lti.api.LTIService");
+        ltiService = (LTIService) ComponentManager.getInstance().get("org.sakaiproject.lti.api.LTIService");
 
         ApplicationContext ac = WebApplicationContextUtils.getWebApplicationContext(config.getServletContext());
 

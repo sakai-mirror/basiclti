@@ -23,6 +23,7 @@ import java.util.Properties;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Enumeration;
 import java.net.URL;
@@ -52,6 +53,7 @@ import org.sakaiproject.site.cover.SiteService;
 import org.sakaiproject.api.privacy.PrivacyManager;
 import org.sakaiproject.authz.cover.AuthzGroupService;
 import org.sakaiproject.authz.api.AuthzGroup;
+import org.sakaiproject.authz.api.GroupProvider;
 import org.sakaiproject.authz.api.Role;
 import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.authz.api.GroupNotDefinedException;
@@ -107,6 +109,7 @@ public class SakaiBLTIUtil {
 	public static final String BASICLTI_CONSUMER_USERIMAGE_ENABLED = "basiclti.consumer.userimage.enabled";
     public static final String INCOMING_ROSTER_ENABLED = "basiclti.incoming.roster.enabled";
 	public static final String BASICLTI_ENCRYPTION_KEY = "basiclti.encryption.key";
+	public static final String BASICLTI_LAUNCH_SESSION_TIMEOUT = "basiclti.launch.session.timeout";
 
 	public static final String SVC_tc_profile = "tc_profile";
 	public static final String SVC_tc_registration = "tc_registration";
@@ -307,8 +310,9 @@ public class SakaiBLTIUtil {
 		setProperty(lti2subst,"Membership.role",theRole);
 
 		String realmId = SiteService.siteReference(context);
+		User user = null;
 		try {
-			User user = UserDirectoryService.getCurrentUser();
+			user = UserDirectoryService.getCurrentUser();
 			if ( user != null ) {
 				Role role = null;
 				String roleId = null;
@@ -319,6 +323,30 @@ public class SakaiBLTIUtil {
 			}
 		} catch (GroupNotDefinedException e) {
 			dPrint("SiteParticipantHelper.getExternalRealmId: site realm not found"+e.getMessage());
+		}
+
+		// Check if there are sections the user is part of (may be more than one)
+		String courseRoster = getExternalRealmId(context);
+		if ( user!= null && courseRoster != null )
+		{
+			GroupProvider groupProvider = (GroupProvider) ComponentManager.get(
+				org.sakaiproject.authz.api.GroupProvider.class);
+			String[] courseRosters = groupProvider.unpackId(courseRoster);
+			List<String> rosterList = new ArrayList<String>();
+			String userEid = user.getEid();
+			for(int i=0; i<courseRosters.length;i++) {
+				String providerId = courseRosters[i];
+				Map userRole = groupProvider.getUserRolesForGroup(providerId);
+				if (userRole.containsKey(userEid)) {
+					rosterList.add(providerId);
+				}
+			}
+			if ( rosterList.size() > 0 ) {
+				String[] sArray = new String[rosterList.size()];
+				sArray = (String[]) rosterList.toArray(sArray);
+				String providedGroups = groupProvider.packId(sArray);
+				setProperty(props,"ext_sakai_section",providedGroups);
+			}
 		}
 	}
 
@@ -419,6 +447,7 @@ public class SakaiBLTIUtil {
 
 				if ( "true".equals(allowOutcomes) && assignment != null ) {
 					setProperty(props,BasicLTIConstants.LIS_RESULT_SOURCEDID, result_sourcedid);  
+					setProperty(props,"ext_outcome_data_values_accepted", "text");  // SAK-25696
 
 					// New Basic Outcomes URL
 					String outcome_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lis_basic_outcome_url",null);
@@ -432,10 +461,6 @@ public class SakaiBLTIUtil {
 				if ( "on".equals(allowSettings) ) {
 					setProperty(props,"ext_ims_lti_tool_setting_id", result_sourcedid);  
 
-					String setting = config.getProperty("toolsetting", null);
-					if ( setting != null ) {
-						setProperty(props,"ext_ims_lti_tool_setting", setting);  
-					}
 					String service_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lti_tool_setting_url",null);
 					if ( service_url == null ) service_url = getOurServerUrl() + LTI1_PATH;  
 					setProperty(props,"ext_ims_lti_tool_setting_url", service_url);  
@@ -696,20 +721,14 @@ public class SakaiBLTIUtil {
 				setProperty(lti2subst, "Result.url", result_url);
 			}
 
-			// We don't allow LTI 2 tools to have access to the old settings extension
-			// because they can use it to set it to non-JSON
+			// We continue to support the old settings for LTI 2 see SAK-25621
 			if ( allowsettings == 1 ) {
-				if ( isLTI1 ) {
-					setProperty(ltiProps,"ext_ims_lti_tool_setting_id", result_sourcedid);  
+				setProperty(ltiProps,"ext_ims_lti_tool_setting_id", result_sourcedid);  
 
-					String setting = (String) content.get(LTIService.LTI_SETTINGS);
-					if ( setting != null ) {
-						setProperty(ltiProps,"ext_ims_lti_tool_setting", setting);  
-					}
-					String service_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lti_tool_setting_url",null);
-					if ( service_url == null ) service_url = getOurServerUrl() + LTI1_PATH;  
-					setProperty(ltiProps,"ext_ims_lti_tool_setting_url", service_url);  
-				} else {
+				String service_url = ServerConfigurationService.getString("basiclti.consumer.ext_ims_lti_tool_setting_url",null);
+				if ( service_url == null ) service_url = getOurServerUrl() + LTI1_PATH;  
+				setProperty(ltiProps,"ext_ims_lti_tool_setting_url", service_url);  
+				if ( ! isLTI1 ) {
 					String settings_url = getOurServerUrl() + LTI2_PATH +  SVC_Settings + "/";
 					setProperty(lti2subst,"LtiLink.custom.url", settings_url + LTI2Util.SCOPE_LtiLink + "/" + resource_link_id);
 					setProperty(lti2subst,"ToolProxyBinding.custom.url", settings_url + LTI2Util.SCOPE_ToolProxyBinding + "/" + resource_link_id);
@@ -1072,7 +1091,7 @@ public class SakaiBLTIUtil {
 
 	// Boolean.TRUE - Grade deleted
     public static Object deleteGrade(String sourcedid, HttpServletRequest request, 
-		LTIService ltiService, Double grade, String comment)
+		LTIService ltiService)
 	{
 		return handleGradebook(sourcedid, request, ltiService, false, true, null, null);
 	}
