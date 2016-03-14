@@ -333,12 +333,7 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 										   }
 									   }
 								   }
-
-								   // Adjust the content items based on the tool items
-								   if ( tool != null || content != null ) 
-								   {
-									   ltiService.filterContent(content, tool);
-								   }
+								   ltiService.filterContent(content, tool);
 							   }
 							   String splash = null;
 							   if ( tool != null ) splash = (String) tool.get("splash");
